@@ -15,7 +15,7 @@
                     <label class="control-label col-lg-3 required">آدرس وب‌سرویس (Base URL):</label>
                     <div class="col-lg-6">
                         <input type="text" name="NITRON_PAY_BASE_URL" value="{$base_url|escape:'html':'UTF-8'}" class="form-control" required>
-                        <p class="help-block">آدرس پایه سرور درگاه نیترون پی (پیش‌فرض: https://pay.aryashid.ir)</p>
+                        <p class="help-block">آدرس پایه سرور هاب پرداخت نیترون پی (سرور اصلی: https://app.nitron.pro/pay یا سرور شخصی / اختصاصی شما)</p>
                     </div>
                 </div>
 

@@ -23,7 +23,7 @@ class NitronPayApi
         $this->apiSecret = trim(Configuration::get('NITRON_PAY_API_SECRET'));
         $url = trim(Configuration::get('NITRON_PAY_BASE_URL'));
         if (empty($url)) {
-            $url = 'https://pay.aryashid.ir';
+            $url = 'https://app.nitron.pro/pay';
         }
         $this->baseUrl = rtrim($url, '/');
     }

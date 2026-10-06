@@ -57,7 +57,7 @@ class Nitron_Pay extends PaymentModule
         // مقادیر پیش‌فرض پیکربندی
         Configuration::updateValue('NITRON_PAY_API_KEY', '');
         Configuration::updateValue('NITRON_PAY_API_SECRET', '');
-        Configuration::updateValue('NITRON_PAY_BASE_URL', 'https://pay.aryashid.ir');
+        Configuration::updateValue('NITRON_PAY_BASE_URL', 'https://app.nitron.pro/pay');
         Configuration::updateValue('NITRON_PAY_TITLE', 'پرداخت آنلاین نیترون (کارت‌های عضو شتاب)');
         Configuration::updateValue('NITRON_PAY_CURRENCY_UNIT', 'auto'); // auto, rial, toman
         Configuration::updateValue('NITRON_PAY_ENABLE_INQUIRY', 1); // استعلام مضاعف امنیتی از بانک

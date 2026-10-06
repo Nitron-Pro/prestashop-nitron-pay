@@ -50,7 +50,7 @@ class AdminNitronPayConfigController extends ModuleAdminController
         $osFailed = (int) Tools::getValue('NITRON_PAY_OS_FAILED');
 
         if (empty($baseUrl)) {
-            $baseUrl = 'https://pay.aryashid.ir';
+            $baseUrl = 'https://app.nitron.pro/pay';
         }
 
         Configuration::updateValue('NITRON_PAY_API_KEY', $apiKey);
@@ -88,7 +88,7 @@ class AdminNitronPayConfigController extends ModuleAdminController
             'logs_url' => $this->context->link->getAdminLink('AdminNitronPayLogs'),
             'api_key' => Configuration::get('NITRON_PAY_API_KEY'),
             'api_secret' => Configuration::get('NITRON_PAY_API_SECRET'),
-            'base_url' => Configuration::get('NITRON_PAY_BASE_URL') ?: 'https://pay.aryashid.ir',
+            'base_url' => Configuration::get('NITRON_PAY_BASE_URL') ?: 'https://app.nitron.pro/pay',
             'gateway_title' => Configuration::get('NITRON_PAY_TITLE') ?: 'پرداخت آنلاین نیترون (کارت‌های عضو شتاب)',
             'currency_unit' => Configuration::get('NITRON_PAY_CURRENCY_UNIT') ?: 'auto',
             'enable_inquiry' => Configuration::get('NITRON_PAY_ENABLE_INQUIRY') !== false ? (int) Configuration::get('NITRON_PAY_ENABLE_INQUIRY') : 1,
