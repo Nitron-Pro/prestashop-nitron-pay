@@ -126,7 +126,27 @@ class Nitron_PayValidationModuleFrontController extends ModuleFrontController
             }
         }
 
-        // 5. استعلام مضاعف امنیتی از بانک (در صورت فعال بودن در تنظیمات ماژول)
+        // 5. استعلام ضد هایجک و تایید یک‌بارمصرف از هسته نیترون‌پی (Anti-Hijack Lookup)
+        if ($isVerifiedSuccess) {
+            $lookupRes = $api->lookupPayment($siteOrderId, $transaction->uuid);
+            if ($lookupRes['success'] && isset($lookupRes['data'])) {
+                $lData = $lookupRes['data'];
+                // بررسی شرط can_settle برای اطمینان از مجاز بودن تسویه و ثبت سفارش
+                if (isset($lData['can_settle']) && !$lData['can_settle']) {
+                    NitronPayLogger::log('lookup_settle_forbidden', 'تاییدیه تسویه تراکنش قبلاً صادر شده یا معتبر نیست (can_settle=false)', $siteOrderId, $transaction->uuid, null, $lData);
+                    $this->errors[] = $this->module->l('این تراکنش قبلاً تایید و تسویه شده است و امکان استفاده مجدد ندارد.');
+                    $this->redirectWithNotifications('index.php?controller=order&step=1');
+                    return;
+                }
+                if (!empty($lData['ref_id'])) {
+                    $finalRefId = $lData['ref_id'];
+                    $transaction->ref_id = $finalRefId;
+                }
+                NitronPayLogger::log('lookup_success', 'تاییدیه یک‌بارمصرف هسته دریافت شد (can_settle=true)', $siteOrderId, $transaction->uuid, null, $lData);
+            }
+        }
+
+        // 6. استعلام اختیاری مضاعف امنیتی از بانک (در صورت فعال بودن در تنظیمات ماژول)
         if ($isVerifiedSuccess && (int) Configuration::get('NITRON_PAY_ENABLE_INQUIRY', 1)) {
             $inquiryRes = $api->inquiryPayment($siteOrderId, $transaction->uuid);
             if ($inquiryRes['success']) {
@@ -145,7 +165,7 @@ class Nitron_PayValidationModuleFrontController extends ModuleFrontController
             }
         }
 
-        // 6. در صورت تایید موفق، ایجاد سفارش در پرستاشاپ
+        // 7. در صورت تایید موفق، ایجاد سفارش در پرستاشاپ
         if ($isVerifiedSuccess) {
             $totalOrder = (float) $transaction->amount_order;
             $currencyId = (int) $transaction->id_currency;

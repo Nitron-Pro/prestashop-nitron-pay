@@ -68,7 +68,28 @@ class NitronPayApi
     }
 
     /**
-     * استعلام وضعیت تراکنش
+     * بررسی و تایید یک‌بارمصرف وضعیت پرداخت از هسته بدون تماس مجدد با بانک (ضد هایجک / Anti-Hijack)
+     * اندپوینت: POST /api/v1/payments/lookup
+     *
+     * @param string $siteOrderId
+     * @param string|null $uuid
+     * @return array
+     */
+    public function lookupPayment($siteOrderId, $uuid = null)
+    {
+        $payload = [
+            'orderid' => (string) $siteOrderId,
+            'site_order_id' => (string) $siteOrderId,
+        ];
+        if (!empty($uuid)) {
+            $payload['uuid'] = (string) $uuid;
+        }
+
+        return $this->request('POST', '/api/v1/payments/lookup', $payload, $siteOrderId, $uuid);
+    }
+
+    /**
+     * استعلام وضعیت تراکنش از بانک (اختیاری)
      *
      * @param string $siteOrderId
      * @param string|null $uuid
