@@ -20,5 +20,10 @@
         <h3 class="alert-heading">{l s='وضعیت پرداخت نامشخص یا ناتمام است' mod='nitron_pay'}</h3>
         <p>{l s='سفارش شما با شناسه #%s ثبت شده است اما هنوز تایید پرداخت قطعی از درگاه دریافت نشده است.' sprintf=[$order->id] mod='nitron_pay'}</p>
         <p>{l s='در صورت کسر وجه از حساب شما و عدم بازگشت طی ۷۲ ساعت، با پشتیبانی فروشگاه تماس بگیرید.' mod='nitron_pay'}</p>
+        <p>
+            <a class="btn btn-primary" href="{$link->getPageLink('order-detail', true, null, ['id_order' => $order->id])|escape:'html':'UTF-8'}">
+                {l s='مشاهده سفارش و تلاش مجدد برای پرداخت' mod='nitron_pay'}
+            </a>
+        </p>
     </div>
 {/if}

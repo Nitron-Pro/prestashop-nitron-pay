@@ -48,6 +48,7 @@ class AdminNitronPayConfigController extends ModuleAdminController
         $enableInquiry = (int) Tools::getValue('NITRON_PAY_ENABLE_INQUIRY', 0);
         $osSuccess = (int) Tools::getValue('NITRON_PAY_OS_SUCCESS');
         $osFailed = (int) Tools::getValue('NITRON_PAY_OS_FAILED');
+        $osPending = (int) Tools::getValue('NITRON_PAY_OS_PENDING');
 
         if (empty($baseUrl)) {
             $baseUrl = 'https://app.nitron.pro/pay';
@@ -61,6 +62,9 @@ class AdminNitronPayConfigController extends ModuleAdminController
         Configuration::updateValue('NITRON_PAY_ENABLE_INQUIRY', $enableInquiry);
         Configuration::updateValue('NITRON_PAY_OS_SUCCESS', $osSuccess);
         Configuration::updateValue('NITRON_PAY_OS_FAILED', $osFailed);
+        if ($osPending > 0) {
+            Configuration::updateValue('NITRON_PAY_OS_PENDING', $osPending);
+        }
 
         $this->confirmations[] = 'تنظیمات درگاه نیترون با موفقیت ذخیره شد.';
     }
@@ -85,7 +89,8 @@ class AdminNitronPayConfigController extends ModuleAdminController
 
         $this->context->smarty->assign([
             'current_url' => $this->context->link->getAdminLink('AdminNitronPayConfig'),
-            'logs_url' => $this->context->link->getAdminLink('AdminNitronPayLogs'),
+            'logs_url' => $this->context->link->getAdminLink('AdminNitronPayLogs') . '&np_tab=transactions',
+            'reports_url' => $this->context->link->getAdminLink('AdminNitronPayReports'),
             'api_key' => Configuration::get('NITRON_PAY_API_KEY'),
             'api_secret' => Configuration::get('NITRON_PAY_API_SECRET'),
             'base_url' => Configuration::get('NITRON_PAY_BASE_URL') ?: 'https://app.nitron.pro/pay',
@@ -94,6 +99,7 @@ class AdminNitronPayConfigController extends ModuleAdminController
             'enable_inquiry' => Configuration::get('NITRON_PAY_ENABLE_INQUIRY') !== false ? (int) Configuration::get('NITRON_PAY_ENABLE_INQUIRY') : 1,
             'os_success' => (int) Configuration::get('NITRON_PAY_OS_SUCCESS') ?: (int) Configuration::get('PS_OS_PAYMENT'),
             'os_failed' => (int) Configuration::get('NITRON_PAY_OS_FAILED') ?: (int) Configuration::get('PS_OS_ERROR'),
+            'os_pending' => (int) Configuration::get('NITRON_PAY_OS_PENDING'),
             'order_states' => $orderStates,
             'currencies' => $currencies,
         ]);

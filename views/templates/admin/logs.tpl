@@ -1,17 +1,15 @@
 <div class="nitron-pay-admin-wrapper">
+    {include file='./_nav_tabs.tpl'}
+
     <div class="panel">
         <div class="panel-heading">
-            <i class="icon-filter"></i> فیلتر و جستجوی لاگ‌ها
-            <span class="pull-left" style="margin-left: 10px;">
-                <a href="{$config_url|escape:'html':'UTF-8'}" class="btn btn-xs btn-default" style="margin-right: 8px;">
-                    <i class="icon-cogs"></i> بازگشت به تنظیمات
-                </a>
-            </span>
+            <i class="icon-filter"></i> فیلتر لاگ‌های فنی وب‌سرویس
         </div>
         <div class="panel-body">
             <form action="{$current_url|escape:'html':'UTF-8'}" method="get" class="form-horizontal">
                 <input type="hidden" name="controller" value="AdminNitronPayLogs">
-                <input type="hidden" name="token" value="{$smarty.get.token|escape:'html':'UTF-8'}">
+                <input type="hidden" name="token" value="{$admin_token|escape:'html':'UTF-8'}">
+                <input type="hidden" name="np_tab" value="logs">
 
                 <div class="row">
                     <div class="col-lg-3">
@@ -43,96 +41,11 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="icon-search"></i> اعمال فیلتر
                     </button>
-                    <a href="{$current_url|escape:'html':'UTF-8'}" class="btn btn-default">
+                    <a href="{$logs_tab_url|escape:'html':'UTF-8'}" class="btn btn-default">
                         <i class="icon-eraser"></i> پاکسازی فیلتر
                     </a>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <!-- جدول تراکنش‌های اخیر -->
-    <div class="panel">
-        <div class="panel-heading">
-            <i class="icon-credit-card"></i> آخرین تراکنش‌های ایجاد شده (۵۰ مورد اخیر)
-        </div>
-        <div class="panel-body">
-            {if empty($transactions)}
-                <div class="alert alert-info">هیچ تراکنشی یافت نشد.</div>
-            {else}
-                <div class="table-responsive">
-                    <table class="table table-striped table-bordered">
-                        <thead>
-                            <tr>
-                                <th>شناسه تراکنش</th>
-                                <th>شناسه سفارش سایت</th>
-                                <th>شماره سفارش</th>
-                                <th>درگاه</th>
-                                <th>مبلغ (ریال)</th>
-                                <th>وضعیت</th>
-                                <th>کد پیگیری (Ref ID)</th>
-                                <th>کارت بانکی</th>
-                                <th>تاریخ</th>
-                                <th>عملیات</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {foreach from=$transactions item=tx}
-                                <tr>
-                                    <td>{$tx.id_nitron_pay_transaction|escape:'html':'UTF-8'}</td>
-                                    <td>
-                                        <span class="np-copyable" data-clipboard-text="{$tx.site_order_id|escape:'html':'UTF-8'}" title="کلیک جهت کپی">
-                                            <code>{$tx.site_order_id|escape:'html':'UTF-8'}</code>
-                                            <i class="icon-copy" style="font-size:10px; color:#999; margin-right:3px;"></i>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {if $tx.id_order}
-                                            <a href="?controller=AdminOrders&id_order={$tx.id_order|escape:'html':'UTF-8'}&vieworder&token={Tools::getAdminTokenLite('AdminOrders')}" target="_blank">
-                                                #{$tx.id_order|escape:'html':'UTF-8'} ({$tx.order_reference|escape:'html':'UTF-8'})
-                                            </a>
-                                        {else}
-                                            -
-                                        {/if}
-                                    </td>
-                                    <td>{$tx.gateway_name|default:'-'|escape:'html':'UTF-8'}</td>
-                                    <td>{number_format($tx.amount_rial)} ریال</td>
-                                    <td>
-                                        {if $tx.status == 'verified'}
-                                            <span class="label label-success">تایید شده</span>
-                                        {elseif $tx.status == 'redirected_to_gateway'}
-                                            <span class="label label-info">ارسال به درگاه</span>
-                                        {elseif $tx.status == 'failed' || $tx.status == 'cancelled'}
-                                            <span class="label label-danger">لغو / ناموفق</span>
-                                        {else}
-                                            <span class="label label-warning">{$tx.status|escape:'html':'UTF-8'}</span>
-                                        {/if}
-                                    </td>
-                                    <td><b>{$tx.ref_id|default:'-'|escape:'html':'UTF-8'}</b></td>
-                                    <td>{$tx.card_pan|default:'-'|escape:'html':'UTF-8'}</td>
-                                    <td><small>{$tx.date_add|escape:'html':'UTF-8'}</small></td>
-                                    <td>
-                                        {if $tx.uuid}
-                                            <a href="{$current_url|escape:'html':'UTF-8'}&view_transaction_uuid={$tx.uuid|escape:'html':'UTF-8'}" class="btn btn-xs btn-info" title="مشاهده جزئیات و مسیر مراحل">
-                                                <i class="icon-eye"></i> مسیر مراحل
-                                            </a>
-                                        {/if}
-                                        {if $tx.status != 'failed' && $tx.status != 'cancelled' && $tx.status != 'fail' && $tx.status != 'canceled'}
-                                            <form action="{$current_url|escape:'html':'UTF-8'}" method="post" style="display:inline-block;">
-                                                <input type="hidden" name="site_order_id" value="{$tx.site_order_id|escape:'html':'UTF-8'}">
-                                                <input type="hidden" name="uuid" value="{$tx.uuid|escape:'html':'UTF-8'}">
-                                                <button type="submit" name="actionInquiry" class="btn btn-xs btn-default" title="استعلام آخرین وضعیت از بانک">
-                                                    <i class="icon-refresh"></i> استعلام
-                                                </button>
-                                            </form>
-                                        {/if}
-                                    </td>
-                                </tr>
-                            {/foreach}
-                        </tbody>
-                    </table>
-                </div>
-            {/if}
         </div>
     </div>
 
@@ -267,7 +180,7 @@
                             <ul class="pagination" style="margin: 0;">
                                 {if $current_page > 1}
                                     <li>
-                                        <a href="{$current_url|escape:'html':'UTF-8'}&page={$current_page - 1}&filter_action={$filters.action|escape:'html':'UTF-8'}&filter_site_order_id={$filters.site_order_id|escape:'html':'UTF-8'}&filter_date_from={$filters.date_from|escape:'html':'UTF-8'}&filter_date_to={$filters.date_to|escape:'html':'UTF-8'}&filter_status={$filters.status|escape:'html':'UTF-8'}">
+                                        <a href="{$current_url|escape:'html':'UTF-8'}&np_tab=logs&page={$current_page - 1}&filter_action={$filters.action|escape:'html':'UTF-8'}&filter_site_order_id={$filters.site_order_id|escape:'html':'UTF-8'}&filter_date_from={$filters.date_from|escape:'html':'UTF-8'}&filter_date_to={$filters.date_to|escape:'html':'UTF-8'}&filter_status={$filters.status|escape:'html':'UTF-8'}">
                                             &laquo; قبلی
                                         </a>
                                     </li>
@@ -278,7 +191,7 @@
 
                                 {for $p=$startPage to $endPage}
                                     <li class="{if $p == $current_page}active{/if}">
-                                        <a href="{$current_url|escape:'html':'UTF-8'}&page={$p}&filter_action={$filters.action|escape:'html':'UTF-8'}&filter_site_order_id={$filters.site_order_id|escape:'html':'UTF-8'}&filter_date_from={$filters.date_from|escape:'html':'UTF-8'}&filter_date_to={$filters.date_to|escape:'html':'UTF-8'}&filter_status={$filters.status|escape:'html':'UTF-8'}">
+                                        <a href="{$current_url|escape:'html':'UTF-8'}&np_tab=logs&page={$p}&filter_action={$filters.action|escape:'html':'UTF-8'}&filter_site_order_id={$filters.site_order_id|escape:'html':'UTF-8'}&filter_date_from={$filters.date_from|escape:'html':'UTF-8'}&filter_date_to={$filters.date_to|escape:'html':'UTF-8'}&filter_status={$filters.status|escape:'html':'UTF-8'}">
                                             {$p}
                                         </a>
                                     </li>
@@ -286,7 +199,7 @@
 
                                 {if $current_page < $total_pages}
                                     <li>
-                                        <a href="{$current_url|escape:'html':'UTF-8'}&page={$current_page + 1}&filter_action={$filters.action|escape:'html':'UTF-8'}&filter_site_order_id={$filters.site_order_id|escape:'html':'UTF-8'}&filter_date_from={$filters.date_from|escape:'html':'UTF-8'}&filter_date_to={$filters.date_to|escape:'html':'UTF-8'}&filter_status={$filters.status|escape:'html':'UTF-8'}">
+                                        <a href="{$current_url|escape:'html':'UTF-8'}&np_tab=logs&page={$current_page + 1}&filter_action={$filters.action|escape:'html':'UTF-8'}&filter_site_order_id={$filters.site_order_id|escape:'html':'UTF-8'}&filter_date_from={$filters.date_from|escape:'html':'UTF-8'}&filter_date_to={$filters.date_to|escape:'html':'UTF-8'}&filter_status={$filters.status|escape:'html':'UTF-8'}">
                                             بعدی &raquo;
                                         </a>
                                     </li>

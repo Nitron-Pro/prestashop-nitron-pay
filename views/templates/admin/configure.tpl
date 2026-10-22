@@ -4,8 +4,13 @@
             <i class="icon-credit-card"></i> تنظیمات درگاه پرداخت اینترنتی نیترون پی (NitronPay)
             <span class="pull-left" style="margin-left: 10px;">
                 <a href="{$logs_url|escape:'html':'UTF-8'}" class="btn btn-xs btn-default" style="margin-right: 8px;">
-                    <i class="icon-list-alt"></i> مشاهده لاگ‌ها و تراکنش‌ها
+                    <i class="icon-list-alt"></i> تراکنش‌ها
                 </a>
+                {if isset($reports_url)}
+                    <a href="{$reports_url|escape:'html':'UTF-8'}" class="btn btn-xs btn-default" style="margin-right: 8px;">
+                        <i class="icon-bar-chart"></i> گزارش موفق‌ها
+                    </a>
+                {/if}
             </span>
         </div>
         <div class="panel-body">
@@ -70,6 +75,20 @@
                         <p class="help-block">
                             در صورت فعال بودن (پیش‌فرض)، پس از بازگشت موفق، وضعیت نهایی تراکنش مستقیماً از بانک استعلام می‌شود تا از ثبت هرگونه پرداخت جعلی کاملاً جلوگیری گردد.
                         </p>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="control-label col-lg-3">وضعیت سفارش هنگام رفتن به درگاه:</label>
+                    <div class="col-lg-6">
+                        <select name="NITRON_PAY_OS_PENDING" class="form-control">
+                            {foreach from=$order_states item=os}
+                                <option value="{$os.id_order_state|escape:'html':'UTF-8'}" {if $os_pending == $os.id_order_state}selected="selected"{/if}>
+                                    {$os.name|escape:'html':'UTF-8'}
+                                </option>
+                            {/foreach}
+                        </select>
+                        <p class="help-block">سفارش قبل از درگاه با این وضعیت ثبت می‌شود تا اگر مشتری پرداخت را رها کرد، مدیر بتواند تماس بگیرد و لینک پرداخت بفرستد.</p>
                     </div>
                 </div>
 

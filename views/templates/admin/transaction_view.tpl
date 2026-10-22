@@ -207,8 +207,12 @@
                 <i class="icon-file-text"></i> جزئیات و مسیر مراحل پرداخت
             </span>
             <div>
-                {assign var="is_tx_failed" value=(isset($details.status) && ($details.status == 'failed' || $details.status == 'cancelled' || $details.status == 'fail' || $details.status == 'canceled'))}
-                {if !$is_tx_failed}
+                {if !empty($shop_context.retry_url)}
+                    <button type="button" class="btn btn-sm btn-warning np-copyable" data-clipboard-text="{$shop_context.retry_url|escape:'html':'UTF-8'}">
+                        <i class="icon-link"></i> کپی لینک پرداخت مشتری
+                    </button>
+                {/if}
+                {if !empty($can_inquiry)}
                     <form action="{$current_url|escape:'html':'UTF-8'}" method="post" style="display:inline-block;">
                         <input type="hidden" name="site_order_id" value="{$details.site_order_id|default:''|escape:'html':'UTF-8'}">
                         <input type="hidden" name="uuid" value="{$uuid|escape:'html':'UTF-8'}">
@@ -229,6 +233,59 @@
             </div>
         {/if}
 
+        {if isset($shop_context)}
+            <div class="np-meta-grid">
+                <div class="np-meta-item">
+                    <span class="np-meta-label">مشتری:</span>
+                    <span class="np-meta-value">
+                        {if $shop_context.customer_admin_url}
+                            <a href="{$shop_context.customer_admin_url|escape:'html':'UTF-8'}" style="color:#93c5fd;">
+                                {$shop_context.customer_name|default:'-'|escape:'html':'UTF-8'}
+                            </a>
+                        {else}
+                            {$shop_context.customer_name|default:'-'|escape:'html':'UTF-8'}
+                        {/if}
+                    </span>
+                </div>
+                <div class="np-meta-item">
+                    <span class="np-meta-label">ایمیل:</span>
+                    <span class="np-meta-value">
+                        {if $shop_context.customer_email}
+                            <a href="mailto:{$shop_context.customer_email|escape:'html':'UTF-8'}" style="color:#93c5fd;">{$shop_context.customer_email|escape:'html':'UTF-8'}</a>
+                        {else}-{/if}
+                    </span>
+                </div>
+                <div class="np-meta-item">
+                    <span class="np-meta-label">موبایل:</span>
+                    <span class="np-meta-value">
+                        {if $shop_context.customer_phone}
+                            <a href="tel:{$shop_context.customer_phone|escape:'html':'UTF-8'}" style="color:#93c5fd;">{$shop_context.customer_phone|escape:'html':'UTF-8'}</a>
+                        {else}-{/if}
+                    </span>
+                </div>
+                <div class="np-meta-item">
+                    <span class="np-meta-label">سبد خرید:</span>
+                    <span class="np-meta-value">
+                        {if $shop_context.id_cart}
+                            <a href="{$shop_context.cart_admin_url|escape:'html':'UTF-8'}" style="color:#93c5fd;">#{$shop_context.id_cart|intval}</a>
+                        {else}-{/if}
+                    </span>
+                </div>
+                <div class="np-meta-item">
+                    <span class="np-meta-label">سفارش فروشگاه:</span>
+                    <span class="np-meta-value">
+                        {if $shop_context.id_order}
+                            <a href="{$shop_context.order_admin_url|escape:'html':'UTF-8'}" style="color:#93c5fd;">
+                                #{$shop_context.id_order|intval}{if $shop_context.order_reference} ({$shop_context.order_reference|escape:'html':'UTF-8'}){/if}
+                            </a>
+                        {else}
+                            هنوز سفارش ندارد
+                        {/if}
+                    </span>
+                </div>
+            </div>
+        {/if}
+
         <!-- اطلاعات کلی تراکنش مشابه پنل نیترون -->
         <div class="np-meta-grid">
             <div class="np-meta-item">
@@ -244,8 +301,10 @@
                 <span class="np-meta-value">
                     {if is_array($details.gateway)}
                         {$details.gateway.name|default:$details.gateway.driver|default:'-'|escape:'html':'UTF-8'}
+                    {elseif !empty($details.gateway)}
+                        {$details.gateway|escape:'html':'UTF-8'}
                     {else}
-                        {$details.gateway|default:'زیبال / شاپرک'|escape:'html':'UTF-8'}
+                        -
                     {/if}
                 </span>
             </div>
@@ -256,10 +315,12 @@
             <div class="np-meta-item">
                 <span class="np-meta-label">وضعیت پرداخت:</span>
                 <span class="np-meta-value">
-                    {if isset($details.status) && ($details.status == 'verified' || $details.status == 'success')}
-                        <span class="np-badge-success">موفق / تایید شده</span>
-                    {elseif isset($details.status) && ($details.status == 'failed' || $details.status == 'cancelled')}
-                        <span class="np-badge-danger">لغو / ناموفق</span>
+                    {if isset($status_meta) && $status_meta.group == 'success'}
+                        <span class="np-badge-success">{$status_meta.label|escape:'html':'UTF-8'}</span>
+                    {elseif isset($status_meta) && $status_meta.group == 'failed'}
+                        <span class="np-badge-danger">{$status_meta.label|escape:'html':'UTF-8'}</span>
+                    {elseif isset($status_meta)}
+                        <span class="np-badge-warning">{$status_meta.label|escape:'html':'UTF-8'}</span>
                     {else}
                         <span class="np-badge-warning">{$details.status|default:'در انتظار'|escape:'html':'UTF-8'}</span>
                     {/if}
@@ -363,48 +424,16 @@
                         </div>
                     {/foreach}
                 {else}
-                    <!-- در صورتی که stages از API نیامده بود، از وقایع لاگ‌شده استفاده می‌کنیم -->
-                    <div class="np-step-card">
+                    <div class="np-step-card is-skipped">
                         <div class="np-step-header">
-                            <span class="np-step-name">۱. درخواست توکن و ساخت پرداخت</span>
-                            <span class="np-step-status">انجام شد</span>
+                            <span class="np-step-name">مسیر مراحل در دسترس نیست</span>
+                            <span class="np-step-status status-skipped">نامشخص</span>
                         </div>
-                        <div class="np-step-desc">درخواست ایجاد تراکنش با موفقیت به نیترون ارسال شد.</div>
-                    </div>
-
-                    <div class="np-step-card">
-                        <div class="np-step-header">
-                            <span class="np-step-name">۲. آماده‌سازی و ارسال به درگاه</span>
-                            <span class="np-step-status">انجام شد</span>
-                        </div>
-                        <div class="np-step-desc">آدرس پرداخت (payment_url) دریافت و کاربر به صفحه درگاه شاپرک هدایت شد.</div>
-                    </div>
-
-                    <div class="np-step-card">
-                        <div class="np-step-header">
-                            <span class="np-step-name">۳. بازگشت از درگاه</span>
-                            <span class="np-step-status">انجام شد</span>
-                        </div>
-                        <div class="np-step-desc">کاربر به همراه داده‌های کال‌بک و امضای امنیتی به فروشگاه بازگشت.</div>
-                    </div>
-
-                    <div class="np-step-card">
-                        <div class="np-step-header">
-                            <span class="np-step-name">۴. وریفای و تایید نهایی</span>
-                            <span class="np-step-status">انجام شد</span>
-                        </div>
-                        <div class="np-step-desc">تراکنش با موفقیت وریفای شد. کد پیگیری: <b>{$details.ref_id|default:'-'|escape:'html':'UTF-8'}</b></div>
-                    </div>
-
-                    <div class="np-step-card">
-                        <div class="np-step-header">
-                            <span class="np-step-name">۵. استعلام و راستی‌آزمایی تراکنش</span>
-                            <span class="np-step-status">تایید مضاعف</span>
-                        </div>
-                        <div class="np-step-desc">استعلام مستقیم از بانک جهت جلوگیری از پرداخت‌های جعلی انجام شد.</div>
+                        <div class="np-step-desc">برای این تراکنش مرحله‌ای از هسته یا لاگ محلی پیدا نشد. وضعیت کلی را از کادر بالا بخوانید؛ ارسال به درگاه به‌معنی پرداخت موفق نیست.</div>
                     </div>
                 {/if}
             </div>
         </div>
     </div>
+    {include file='./_admin_assets.tpl'}
 </div>

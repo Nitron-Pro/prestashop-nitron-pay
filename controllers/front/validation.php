@@ -45,18 +45,26 @@ class Nitron_PayValidationModuleFrontController extends ModuleFrontController
         }
 
         $cart = new Cart((int) $transaction->id_cart);
-        if (!Validate::isLoadedObject($cart)) {
-            $this->errors[] = $this->module->l('سبد خرید مربوط به این تراکنش یافت نشد.');
-            $this->redirectWithNotifications('index.php?controller=order&step=1');
-            return;
+        $customer = new Customer((int) $transaction->id_customer);
+        if (!Validate::isLoadedObject($customer) && Validate::isLoadedObject($cart)) {
+            $customer = new Customer((int) $cart->id_customer);
         }
-
-        $customer = new Customer((int) $cart->id_customer);
         if (!Validate::isLoadedObject($customer)) {
             $this->errors[] = $this->module->l('مشتری مربوط به سفارش یافت نشد.');
             $this->redirectWithNotifications('index.php?controller=order&step=1');
             return;
         }
+
+        /** @var Nitron_Pay $module */
+        $module = $this->module;
+        $idOrder = (int) $transaction->id_order;
+        if ($idOrder <= 0 && Validate::isLoadedObject($cart)) {
+            $idOrder = (int) Order::getIdByCartId((int) $cart->id);
+        }
+        $order = $idOrder > 0 ? new Order($idOrder) : null;
+        $followUpUrl = ($order && Validate::isLoadedObject($order))
+            ? $module->getOrderFollowUpUrl($order, $customer)
+            : 'index.php?controller=order&step=1';
 
         $api = new NitronPayApi();
 
@@ -68,7 +76,7 @@ class Nitron_PayValidationModuleFrontController extends ModuleFrontController
         if (!empty($signature) && !$api->verifySignature($callbackParams, $signature)) {
             NitronPayLogger::log('verify_signature_failed', 'امضای بازگشتی با کلید امنیتی سرور همخوانی ندارد.', $siteOrderId, $transaction->uuid, $callbackParams);
             $this->errors[] = $this->module->l('اعتبارسنجی امضای امنیتی تراکنش ناموفق بود.');
-            $this->redirectWithNotifications('index.php?controller=order&step=1');
+            $this->redirectWithNotifications($followUpUrl);
             return;
         }
 
@@ -78,8 +86,12 @@ class Nitron_PayValidationModuleFrontController extends ModuleFrontController
             $transaction->save();
 
             NitronPayLogger::log('payment_cancelled', 'پرداخت توسط کاربر لغو یا ناموفق اعلام شد: ' . $status, $siteOrderId, $transaction->uuid);
-            $this->errors[] = $this->module->l('پرداخت شما در درگاه بانکی لغو یا ناموفق بود.');
-            $this->redirectWithNotifications('index.php?controller=order&step=1');
+            $failedStatus = (int) Configuration::get('NITRON_PAY_OS_FAILED');
+            if ($idOrder > 0 && $failedStatus > 0) {
+                $module->changeExistingOrderState($idOrder, $failedStatus);
+            }
+            $this->errors[] = $this->module->l('پرداخت شما در درگاه بانکی لغو یا ناموفق بود. می‌توانید دوباره از همین سفارش پرداخت کنید.');
+            $this->redirectWithNotifications($followUpUrl);
             return;
         }
 
@@ -120,8 +132,12 @@ class Nitron_PayValidationModuleFrontController extends ModuleFrontController
                 $transaction->save();
 
                 $errMsg = !empty($verifyRes['message']) ? $verifyRes['message'] : 'تایید نهایی تراکنش توسط بانک انجام نشد.';
+                $failedStatus = (int) Configuration::get('NITRON_PAY_OS_FAILED');
+                if ($idOrder > 0 && $failedStatus > 0) {
+                    $module->changeExistingOrderState($idOrder, $failedStatus);
+                }
                 $this->errors[] = $errMsg;
-                $this->redirectWithNotifications('index.php?controller=order&step=1');
+                $this->redirectWithNotifications($followUpUrl);
                 return;
             }
         }
@@ -135,7 +151,7 @@ class Nitron_PayValidationModuleFrontController extends ModuleFrontController
                 if (isset($lData['can_settle']) && !$lData['can_settle']) {
                     NitronPayLogger::log('lookup_settle_forbidden', 'تاییدیه تسویه تراکنش قبلاً صادر شده یا معتبر نیست (can_settle=false)', $siteOrderId, $transaction->uuid, null, $lData);
                     $this->errors[] = $this->module->l('این تراکنش قبلاً تایید و تسویه شده است و امکان استفاده مجدد ندارد.');
-                    $this->redirectWithNotifications('index.php?controller=order&step=1');
+                    $this->redirectWithNotifications($followUpUrl);
                     return;
                 }
                 if (!empty($lData['ref_id'])) {
@@ -165,7 +181,7 @@ class Nitron_PayValidationModuleFrontController extends ModuleFrontController
             }
         }
 
-        // 7. در صورت تایید موفق، ایجاد سفارش در پرستاشاپ
+        // 7. در صورت تایید موفق، نهایی کردن سفارش از قبل ثبت‌شده
         if ($isVerifiedSuccess) {
             $totalOrder = (float) $transaction->amount_order;
             $currencyId = (int) $transaction->id_currency;
@@ -174,10 +190,11 @@ class Nitron_PayValidationModuleFrontController extends ModuleFrontController
                 $orderStatusId = (int) Configuration::get('PS_OS_PAYMENT');
             }
 
-            // بررسی اینکه قبلا سفارش برای این سبد ایجاد نشده باشد
-            if ((int) $cart->orderExists() > 0) {
+            if ($idOrder <= 0 && Validate::isLoadedObject($cart) && (int) $cart->orderExists() > 0) {
                 $idOrder = (int) Order::getIdByCartId((int) $cart->id);
-            } else {
+            }
+
+            if ($idOrder <= 0 && Validate::isLoadedObject($cart)) {
                 $extraVars = [
                     'transaction_id' => $finalRefId,
                 ];
@@ -195,9 +212,10 @@ class Nitron_PayValidationModuleFrontController extends ModuleFrontController
                 );
 
                 $idOrder = (int) $this->module->currentOrder;
+            } elseif ($idOrder > 0) {
+                $module->changeExistingOrderState($idOrder, $orderStatusId);
             }
 
-            // ذخیره شناسه سفارش ایجاد شده در رکورد تراکنش
             $transaction->id_order = $idOrder;
             $transaction->save();
 
@@ -228,8 +246,7 @@ class Nitron_PayValidationModuleFrontController extends ModuleFrontController
             return;
         }
 
-        // در غیر این صورت
-        $this->errors[] = $this->module->l('پرداخت تایید نشد.');
-        $this->redirectWithNotifications('index.php?controller=order&step=1');
+        $this->errors[] = $this->module->l('پرداخت تایید نشد. می‌توانید از صفحه همین سفارش دوباره تلاش کنید.');
+        $this->redirectWithNotifications($followUpUrl);
     }
 }

@@ -24,7 +24,9 @@ CREATE TABLE IF NOT EXISTS `PREFIX_nitron_pay_transaction` (
     KEY `idx_uuid` (`uuid`),
     KEY `idx_cart` (`id_cart`),
     KEY `idx_order` (`id_order`),
-    KEY `idx_status` (`status`)
+    KEY `idx_customer` (`id_customer`),
+    KEY `idx_status` (`status`),
+    KEY `idx_date_add` (`date_add`)
 ) ENGINE=ENGINE_TYPE DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `PREFIX_nitron_pay_log` (

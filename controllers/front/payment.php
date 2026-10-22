@@ -53,23 +53,53 @@ class Nitron_PayPaymentModuleFrontController extends ModuleFrontController
             return;
         }
 
-        // تولید شناسه سفارش منحصر به‌فرد برای سایت
-        $siteOrderId = $cart->id . '_' . time();
+        $existingOrderId = (int) Order::getIdByCartId((int) $cart->id);
+        if ($existingOrderId > 0) {
+            $existingOrder = new Order($existingOrderId);
+            if (Validate::isLoadedObject($existingOrder) && !$module->isOrderPayable($existingOrder)) {
+                Tools::redirect(
+                    'index.php?controller=order-confirmation&id_cart=' . (int) $cart->id .
+                    '&id_module=' . (int) $module->id .
+                    '&id_order=' . $existingOrderId .
+                    '&key=' . $customer->secure_key
+                );
+                return;
+            }
+        }
 
-        $callbackUrl = $this->context->link->getModuleLink(
-            $this->module->name,
-            'validation',
-            [],
-            true
-        );
+        $order = $module->createPendingOrder($cart, $customer, $currency, $totalOrder);
+        if (!$order || !Validate::isLoadedObject($order)) {
+            $this->errors[] = $this->module->l('ثبت سفارش پیش از پرداخت با خطا مواجه شد. لطفاً دوباره تلاش کنید.');
+            $this->redirectWithNotifications('index.php?controller=order&step=1');
+            return;
+        }
+
+        $this->startGatewayPayment($order, $customer, $currency, $totalOrder, $amountRial);
+    }
+
+    /**
+     * ساخت تراکنش و هدایت به درگاه برای سفارش از قبل ثبت‌شده
+     *
+     * @param Order $order
+     * @param Customer $customer
+     * @param Currency $currency
+     * @param float $totalOrder
+     * @param int $amountRial
+     */
+    private function startGatewayPayment(Order $order, Customer $customer, Currency $currency, $totalOrder, $amountRial)
+    {
+        /** @var Nitron_Pay $module */
+        $module = $this->module;
+
+        $siteOrderId = 'NP' . (int) $order->id . '_' . time();
+        $callbackUrl = $this->context->link->getModuleLink($module->name, 'validation', [], true);
 
         $extraParams = [
-            'description' => 'پرداخت سفارش سبد خرید #' . $cart->id . ' در ' . Configuration::get('PS_SHOP_NAME'),
+            'description' => 'پرداخت سفارش #' . (int) $order->id . ' در ' . Configuration::get('PS_SHOP_NAME'),
             'payer_email' => $customer->email,
         ];
 
-        // شماره موبایل در صورت وجود
-        $address = new Address($cart->id_address_invoice ?: $cart->id_address_delivery);
+        $address = new Address((int) $order->id_address_invoice ?: (int) $order->id_address_delivery);
         if (Validate::isLoadedObject($address)) {
             $mobile = !empty($address->phone_mobile) ? $address->phone_mobile : $address->phone;
             if (!empty($mobile)) {
@@ -77,11 +107,11 @@ class Nitron_PayPaymentModuleFrontController extends ModuleFrontController
             }
         }
 
-        // ثبت اولیه تراکنش در دیتابیس
         $transaction = new NitronPayTransaction();
         $transaction->id_shop = (int) $this->context->shop->id;
-        $transaction->id_cart = (int) $cart->id;
-        $transaction->id_customer = (int) $cart->id_customer;
+        $transaction->id_cart = (int) $order->id_cart;
+        $transaction->id_order = (int) $order->id;
+        $transaction->id_customer = (int) $order->id_customer;
         $transaction->id_currency = (int) $currency->id;
         $transaction->site_order_id = $siteOrderId;
         $transaction->amount_rial = (int) $amountRial;
@@ -90,35 +120,35 @@ class Nitron_PayPaymentModuleFrontController extends ModuleFrontController
         $transaction->is_verified = 0;
         $transaction->add();
 
-        // فراخوانی API نیترون برای ایجاد تراکنش
+        NitronPayTransaction::markPreviousAttemptsSuperseded((int) $order->id, (int) $transaction->id);
+
         $api = new NitronPayApi();
         $response = $api->createPayment($amountRial, $siteOrderId, $callbackUrl, $extraParams);
 
         if ($response['success'] && !empty($response['data']['payment_url'])) {
             $data = $response['data'];
-            $paymentUrl = $data['payment_url'];
-            $uuid = isset($data['uuid']) ? $data['uuid'] : null;
-            $gateway = isset($data['gateway']) ? $data['gateway'] : null;
-
-            $transaction->uuid = $uuid;
-            $transaction->gateway_name = $gateway;
-            $transaction->payment_url = $paymentUrl;
+            $transaction->uuid = isset($data['uuid']) ? $data['uuid'] : null;
+            $transaction->gateway_name = isset($data['gateway']) ? $data['gateway'] : null;
+            $transaction->payment_url = $data['payment_url'];
             $transaction->status = isset($data['status']) ? $data['status'] : 'redirected_to_gateway';
             $transaction->raw_create_response = $response['raw'];
             $transaction->save();
 
-            // انتقال کاربر به آدرس درگاه بانک با GET
-            Tools::redirectLink($paymentUrl);
+            $pendingStatus = (int) Configuration::get('NITRON_PAY_OS_PENDING');
+            if ($pendingStatus > 0) {
+                $module->changeExistingOrderState((int) $order->id, $pendingStatus);
+            }
+
+            Tools::redirectLink($data['payment_url']);
             return;
         }
 
-        // در صورت بروز خطا در ایجاد تراکنش
         $transaction->status = 'create_failed';
         $transaction->raw_create_response = $response['raw'];
         $transaction->save();
 
         $errorMessage = !empty($response['message']) ? $response['message'] : 'خطا در ایجاد پرداخت بانکی. لطفاً مجدداً تلاش کنید.';
         $this->errors[] = $errorMessage;
-        $this->redirectWithNotifications('index.php?controller=order&step=1');
+        $this->redirectWithNotifications($module->getOrderFollowUpUrl($order, $customer));
     }
 }
