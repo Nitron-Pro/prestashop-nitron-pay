@@ -23,7 +23,7 @@ class Nitron_Pay extends PaymentModule
     {
         $this->name = 'nitron_pay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.3.0';
+        $this->version = '1.3.2';
         $this->author = 'nitron';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -69,7 +69,7 @@ class Nitron_Pay extends PaymentModule
             && $this->registerHook('paymentOptions')
             && $this->registerHook('displayPaymentReturn')
             && $this->registerHook('displayOrderDetail')
-            && $this->registerHook('displayAdminOrder');
+            && $this->registerHook('displayAdminOrderMainBottom');
     }
 
     public function uninstall()
@@ -334,9 +334,9 @@ class Nitron_Pay extends PaymentModule
     }
 
     /**
-     * جعبه پیگیری پرداخت در صفحه سفارش ادمین
+     * جعبه پیگیری پرداخت در ستون اصلی صفحه سفارش، زیر بلوک پرداخت
      */
-    public function hookDisplayAdminOrder($params)
+    public function hookDisplayAdminOrderMainBottom($params)
     {
         $idOrder = 0;
         if (!empty($params['id_order'])) {
@@ -487,11 +487,8 @@ class Nitron_Pay extends PaymentModule
             }
         }
 
+        $this->ensurePendingOrderState();
         $pendingStatus = (int) Configuration::get('NITRON_PAY_OS_PENDING');
-        if ($pendingStatus <= 0) {
-            $this->ensurePendingOrderState();
-            $pendingStatus = (int) Configuration::get('NITRON_PAY_OS_PENDING');
-        }
         if ($pendingStatus <= 0) {
             $pendingStatus = (int) Configuration::get('PS_OS_PREPARATION');
         }
@@ -526,6 +523,8 @@ class Nitron_Pay extends PaymentModule
         if ($existing > 0) {
             $state = new OrderState($existing);
             if (Validate::isLoadedObject($state)) {
+                $this->ensurePendingStateDoesNotReserveStock($state);
+
                 return $existing;
             }
         }
@@ -537,7 +536,7 @@ class Nitron_Pay extends PaymentModule
         $orderState->color = '#3498DB';
         $orderState->unremovable = false;
         $orderState->hidden = false;
-        $orderState->logable = true;
+        $orderState->logable = false;
         $orderState->delivery = false;
         $orderState->shipped = false;
         $orderState->paid = false;
@@ -568,6 +567,57 @@ class Nitron_Pay extends PaymentModule
     }
 
     /**
+     * وضعیت انتظار نباید موجودی را کم کند. اگر نسخه قبل این کار را کرده، موجودی همان سفارش‌ها برمی‌گردد.
+     *
+     * @param OrderState $state
+     */
+    private function ensurePendingStateDoesNotReserveStock(OrderState $state)
+    {
+        if (!$state->logable && !$state->paid) {
+            return;
+        }
+
+        if (!Configuration::get('NITRON_PAY_PENDING_STOCK_RELEASED')) {
+            $this->releaseStockReservedByPendingOrders((int) $state->id);
+            Configuration::updateValue('NITRON_PAY_PENDING_STOCK_RELEASED', 1);
+        }
+
+        $state->logable = false;
+        $state->paid = false;
+        $state->update();
+    }
+
+    /**
+     * @param int $pendingStateId
+     */
+    private function releaseStockReservedByPendingOrders($pendingStateId)
+    {
+        $orders = Db::getInstance()->executeS(
+            'SELECT `id_order`, `id_shop` FROM `' . _DB_PREFIX_ . 'orders` WHERE `current_state` = ' . (int) $pendingStateId . ' AND `module` = \'nitron_pay\''
+        );
+        if (!$orders) {
+            return;
+        }
+
+        foreach ($orders as $row) {
+            $details = Db::getInstance()->executeS(
+                'SELECT `product_id`, `product_attribute_id`, `product_quantity` FROM `' . _DB_PREFIX_ . 'order_detail` WHERE `id_order` = ' . (int) $row['id_order']
+            );
+            if (!$details) {
+                continue;
+            }
+            foreach ($details as $detail) {
+                StockAvailable::updateQuantity(
+                    (int) $detail['product_id'],
+                    (int) $detail['product_attribute_id'],
+                    (int) $detail['product_quantity'],
+                    (int) $row['id_shop']
+                );
+            }
+        }
+    }
+
+    /**
      * ارتقا به نسخه ۱.۳.۰ برای فروشگاه‌های نصب‌شده
      *
      * @return bool
@@ -577,7 +627,8 @@ class Nitron_Pay extends PaymentModule
         $this->ensurePendingOrderState();
         $this->installTabs();
         $this->registerHook('displayOrderDetail');
-        $this->registerHook('displayAdminOrder');
+        $this->unregisterHook('displayAdminOrder');
+        $this->registerHook('displayAdminOrderMainBottom');
 
         $db = Db::getInstance();
         $table = _DB_PREFIX_ . 'nitron_pay_transaction';

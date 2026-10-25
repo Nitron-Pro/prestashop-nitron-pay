@@ -54,7 +54,7 @@
                 <input type="hidden" name="filter_date_from" value="{$filters.date_from|escape:'html':'UTF-8'}">
                 <input type="hidden" name="filter_date_to" value="{$filters.date_to|escape:'html':'UTF-8'}">
                 <button type="submit" name="exportExcel" value="1" class="btn btn-success">
-                    <i class="icon-download"></i> خروجی اکسل همین بازه
+                    <i class="icon-download"></i> خروجی xlsx همین بازه
                 </button>
                 <span class="help-block" style="display:inline; margin-right:10px;">
                     نام فایل شامل بازه و زمان خروجی است تا با فایل‌های قبلی قاطی نشود.
